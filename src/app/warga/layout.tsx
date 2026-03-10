@@ -19,7 +19,7 @@ export default async function WargaLayout({
 
     const [rows] = await pool.query("SELECT * FROM organization_settings WHERE id = 1");
     // @ts-ignore
-    const settings = rows[0] || { nama_rt: "RT App", logo: null, pic_phone: "" };
+    const settings = rows[0] || { app_title: "RT System", nama_rt: "RT App", logo: null, pic_phone: "" };
 
     // Hitung aduan milik warga yang sudah dibalas tapi belum dibaca
     let aduanBalasan = 0;
@@ -38,7 +38,7 @@ export default async function WargaLayout({
                 {settings.logo && (
                     <img src={settings.logo} alt="Logo" className="w-8 h-8 rounded-full object-cover" />
                 )}
-                <h1 className="text-lg font-bold text-center text-blue-600 truncate max-w-[200px]">{settings.nama_rt}</h1>
+                <h1 className="text-lg font-bold text-center text-blue-600 truncate max-w-[200px]">{settings.app_title || settings.nama_rt}</h1>
             </header>
 
             {/* Main Content */}
