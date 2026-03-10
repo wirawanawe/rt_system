@@ -1,34 +1,39 @@
-const mysql = require('mysql2/promise');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config({ path: '.env.local' });
+const mysql = require('mysql2/promise');
 
 async function migrate() {
-    try {
-        const connection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-        });
+    const pool = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'rt_system',
+    });
 
-        const sqlPath = path.join(__dirname, '../lib/schema/settings.sql');
-        const sql = fs.readFileSync(sqlPath, 'utf8');
+    const columns = [
+        { name: 'provinsi', type: "VARCHAR(100) DEFAULT ''" },
+        { name: 'kota', type: "VARCHAR(100) DEFAULT ''" },
+        { name: 'kecamatan', type: "VARCHAR(100) DEFAULT ''" },
+        { name: 'kelurahan', type: "VARCHAR(100) DEFAULT ''" },
+        { name: 'rw', type: "VARCHAR(10) DEFAULT ''" },
+        { name: 'pic_status', type: "VARCHAR(50) DEFAULT 'Ketua'" },
+        { name: 'logo_kop', type: "VARCHAR(255) DEFAULT ''" },
+    ];
 
-        // Split by semicolon to run multiple statements if needed, but for now it's simple
-        const statements = sql.split(';').filter(stmt => stmt.trim().length > 0);
-
-        for (const statement of statements) {
-            await connection.query(statement);
-            console.log('Executed:', statement.substring(0, 50) + '...');
+    for (const col of columns) {
+        try {
+            await pool.query(`ALTER TABLE organization_settings ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`✅ Column '${col.name}' added`);
+        } catch (err) {
+            if (err.code === 'ER_DUP_FIELDNAME') {
+                console.log(`⏭️  Column '${col.name}' already exists, skipping`);
+            } else {
+                console.error(`❌ Error adding '${col.name}':`, err.message);
+            }
         }
-
-        console.log('Migration completed successfully.');
-        await connection.end();
-    } catch (error) {
-        console.error('Migration failed:', error);
-        process.exit(1);
     }
+
+    console.log('\n✅ Migration complete!');
+    await pool.end();
 }
 
 migrate();

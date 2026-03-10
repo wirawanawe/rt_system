@@ -1,56 +1,48 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import pool from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { requireAdmin, jsonResponse, errorResponse, checkRateLimit } from '@/lib/api-helpers';
 
-// Helper to get total balance
+// Optimized: single query for both filtered summary and global saldo
 async function getSummary(month?: number, year?: number) {
-    let query = `
-        SELECT 
-            SUM(CASE WHEN type = 'pemasukan' THEN nominal ELSE 0 END) as total_masuk,
-            SUM(CASE WHEN type = 'pengeluaran' THEN nominal ELSE 0 END) as total_keluar
-        FROM kas
-    `;
-
-    const params: any[] = [];
     if (month && year) {
-        query += " WHERE MONTH(tanggal) = ? AND YEAR(tanggal) = ?";
-        params.push(month, year);
-    }
-
-    const [rows] = await pool.query<RowDataPacket[]>(query, params);
-
-    // Global saldo (always all time) is more useful? 
-    // Or if filtered, maybe saldo for that period (Masuk - Keluar)?
-    // Let's also fetch global saldo separately if filtering.
-
-    let saldo = 0;
-    if (month && year) {
-        // Fetch global saldo
-        const [globalRows] = await pool.query<RowDataPacket[]>(`
+        // Single query: filtered totals + global saldo in one round trip
+        const [rows] = await pool.query<RowDataPacket[]>(`
             SELECT 
-                SUM(CASE WHEN type = 'pemasukan' THEN nominal ELSE 0 END) -
-                SUM(CASE WHEN type = 'pengeluaran' THEN nominal ELSE 0 END) as saldo
+                COALESCE(SUM(CASE WHEN MONTH(tanggal) = ? AND YEAR(tanggal) = ? AND type = 'pemasukan' THEN nominal END), 0) as total_masuk,
+                COALESCE(SUM(CASE WHEN MONTH(tanggal) = ? AND YEAR(tanggal) = ? AND type = 'pengeluaran' THEN nominal END), 0) as total_keluar,
+                COALESCE(SUM(CASE WHEN type = 'pemasukan' THEN nominal ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN type = 'pengeluaran' THEN nominal ELSE 0 END), 0) as saldo
             FROM kas
-        `);
-        saldo = Number(globalRows[0].saldo || 0);
-    } else {
-        saldo = Number(rows[0].total_masuk || 0) - Number(rows[0].total_keluar || 0);
+        `, [month, year, month, year]);
+
+        return {
+            saldo: Number(rows[0].saldo),
+            total_masuk: Number(rows[0].total_masuk),
+            total_keluar: Number(rows[0].total_keluar),
+        };
     }
+
+    const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT 
+            COALESCE(SUM(CASE WHEN type = 'pemasukan' THEN nominal ELSE 0 END), 0) as total_masuk,
+            COALESCE(SUM(CASE WHEN type = 'pengeluaran' THEN nominal ELSE 0 END), 0) as total_keluar
+        FROM kas
+    `);
+
+    const total_masuk = Number(rows[0].total_masuk);
+    const total_keluar = Number(rows[0].total_keluar);
 
     return {
-        saldo,
-        total_masuk: Number(rows[0].total_masuk || 0),
-        total_keluar: Number(rows[0].total_keluar || 0)
+        saldo: total_masuk - total_keluar,
+        total_masuk,
+        total_keluar,
     };
 }
 
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'pengurus') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     try {
         const { searchParams } = new URL(req.url);
@@ -60,7 +52,7 @@ export async function GET(req: Request) {
 
         if (mode === 'summary') {
             const summary = await getSummary(month, year);
-            return NextResponse.json(summary);
+            return jsonResponse(summary);
         }
 
         let query = "SELECT * FROM kas";
@@ -74,25 +66,26 @@ export async function GET(req: Request) {
         query += " ORDER BY tanggal DESC";
 
         const [rows] = await pool.query<RowDataPacket[]>(query, params);
-        return NextResponse.json(rows);
+        return jsonResponse(rows);
     } catch (error) {
         console.error('Database error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return errorResponse();
     }
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'pengurus') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const rateLimitError = checkRateLimit(req, 'WRITE');
+    if (rateLimitError) return rateLimitError;
+
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     try {
         const body = await req.json();
         const { type, nominal, keterangan, tanggal } = body;
 
         if (!type || !nominal || !keterangan) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            return errorResponse('Missing required fields', 400);
         }
 
         const [result] = await pool.query<ResultSetHeader>(
@@ -100,39 +93,37 @@ export async function POST(req: Request) {
             [type, nominal, keterangan, tanggal || new Date()]
         );
 
-        return NextResponse.json({ id: result.insertId, message: 'Transaction recorded' }, { status: 201 });
+        return jsonResponse({ id: result.insertId, message: 'Transaction recorded' }, { status: 201 });
     } catch (error) {
         console.error('Database error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return errorResponse();
     }
 }
 
 export async function DELETE(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'pengurus') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const rateLimitError = checkRateLimit(req, 'WRITE');
+    if (rateLimitError) return rateLimitError;
+
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');
 
-        if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+        if (!id) return errorResponse('ID required', 400);
 
-        // Only allow deleting manual transactions? Or all? Let's allow manual only for safety.
-        // Actually, let's allow all but if it's 'iuran' maybe warn? 
-        // For now, strict: only manual.
         const [rows] = await pool.query<RowDataPacket[]>("SELECT sumber FROM kas WHERE id = ?", [id]);
-        if (rows.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        if (rows.length === 0) return errorResponse('Not found', 404);
 
         if (rows[0].sumber === 'iuran') {
-            return NextResponse.json({ error: 'Cannot delete automated Iuran transaction manually' }, { status: 400 });
+            return errorResponse('Cannot delete automated Iuran transaction manually', 400);
         }
 
         await pool.query("DELETE FROM kas WHERE id = ?", [id]);
-        return NextResponse.json({ message: 'Deleted' });
+        return jsonResponse({ message: 'Deleted' });
     } catch (error) {
         console.error('Database error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return errorResponse();
     }
 }

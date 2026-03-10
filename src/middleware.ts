@@ -13,7 +13,7 @@ export default withAuth(
                 return NextResponse.redirect(new URL("/login", req.url));
             }
             if (!isPengurus) {
-                return NextResponse.redirect(new URL("/unauthorized", req.url)); // Or redirect to /warga
+                return NextResponse.redirect(new URL("/unauthorized", req.url));
             }
         }
 
@@ -23,6 +23,29 @@ export default withAuth(
                 return NextResponse.redirect(new URL("/login", req.url));
             }
         }
+
+        // Add security headers
+        const response = NextResponse.next();
+
+        // Prevent clickjacking
+        response.headers.set("X-Frame-Options", "DENY");
+
+        // Prevent MIME type sniffing
+        response.headers.set("X-Content-Type-Options", "nosniff");
+
+        // XSS protection (legacy browsers)
+        response.headers.set("X-XSS-Protection", "1; mode=block");
+
+        // Referrer policy
+        response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+        // Permissions policy — disable unnecessary browser features
+        response.headers.set(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        );
+
+        return response;
     },
     {
         callbacks: {

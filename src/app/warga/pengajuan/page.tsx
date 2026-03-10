@@ -111,13 +111,29 @@ export default function PengajuanPage() {
                                 </div>
                                 <div className="text-right">
                                     <Badge variant={item.status === 'approved' ? "default" : item.status === 'rejected' ? "destructive" : "secondary"}>
-                                        {item.status.toUpperCase()}
+                                        {item.status === 'approved' ? 'DISETUJUI' : item.status === 'rejected' ? 'DITOLAK' : 'MENUNGGU'}
                                     </Badge>
-                                    {item.status === 'approved' && (
-                                        <p className="text-xs text-green-600 mt-1">Nomor: {item.nomor_surat}</p>
-                                    )}
                                 </div>
                             </div>
+                            {item.status === 'approved' && (
+                                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <span className="text-green-600 text-lg">✅</span>
+                                        <div>
+                                            <p className="text-sm font-semibold text-green-800">Dokumen siap diambil</p>
+                                            <p className="text-xs text-green-700 mt-0.5">Silakan ambil dokumen Anda di Pengurus RT.</p>
+                                            {item.nomor_surat && (
+                                                <p className="text-xs text-green-600 mt-1 font-medium">No. Surat: {item.nomor_surat}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {item.status === 'rejected' && item.catatan && (
+                                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <p className="text-xs text-red-700">Alasan: {item.catatan}</p>
+                                </div>
+                            )}
                         </Card>
                     ))
                 )}

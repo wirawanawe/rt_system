@@ -1,40 +1,43 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import pool from "@/lib/db";
+import { RowDataPacket } from "mysql2";
+import { requireAuth, requireAdmin, jsonResponse, errorResponse, checkRateLimit } from "@/lib/api-helpers";
 
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { session, error } = await requireAuth();
+    if (error) return error;
 
     try {
-        if (session.user.role === "pengurus") {
-            const [rows] = await db.query(`
+        if (session!.user.role === "pengurus") {
+            const [rows] = await pool.query<RowDataPacket[]>(`
                 SELECT surat.*, warga.nama, warga.nik 
                 FROM surat 
                 JOIN warga ON surat.warga_id = warga.id 
                 ORDER BY surat.tanggal_dibuat DESC
             `);
-            return NextResponse.json(rows);
+            return jsonResponse(rows);
         } else {
-            const [rows] = await db.query(`
+            const [rows] = await pool.query<RowDataPacket[]>(`
                 SELECT * FROM surat 
                 WHERE warga_id = ? 
                 ORDER BY tanggal_dibuat DESC
-            `, [session.user.id]);
-            return NextResponse.json(rows);
+            `, [session!.user.id]);
+            return jsonResponse(rows);
         }
     } catch (error) {
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
+        console.error(error);
+        return errorResponse();
     }
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const rateLimitError = checkRateLimit(req, 'WRITE');
+    if (rateLimitError) return rateLimitError;
+
+    const { session, error } = await requireAuth();
+    if (error) return error;
 
     try {
-        // Handle both JSON and FormData for backward compatibility or future expansion
         const contentType = req.headers.get("content-type") || "";
 
         let jenis_surat, keperluan, keterangan;
@@ -51,35 +54,36 @@ export async function POST(req: Request) {
             keterangan = body.keterangan;
         }
 
-        await db.query(`
+        await pool.query(`
             INSERT INTO surat (warga_id, jenis_surat, keperluan, keterangan, status)
             VALUES (?, ?, ?, ?, 'pending')
-        `, [session.user.id, jenis_surat, keperluan, keterangan]);
+        `, [session!.user.id, jenis_surat, keperluan, keterangan]);
 
-        return NextResponse.json({ message: "Request created" });
+        return jsonResponse({ message: "Request created" }, { status: 201 });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
+        return errorResponse();
     }
 }
 
 export async function PUT(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "pengurus") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const rateLimitError = checkRateLimit(req, 'WRITE');
+    if (rateLimitError) return rateLimitError;
+
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     try {
         const body = await req.json();
         const { id, status, nomor_surat } = body;
 
-        await db.query(`
-              UPDATE surat SET status = ?, nomor_surat = ? WHERE id = ?
-          `, [status, nomor_surat, id]);
+        await pool.query(`
+            UPDATE surat SET status = ?, nomor_surat = ? WHERE id = ?
+        `, [status, nomor_surat, id]);
 
-        return NextResponse.json({ message: "Updated" });
+        return jsonResponse({ message: "Updated" });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
+        return errorResponse();
     }
 }

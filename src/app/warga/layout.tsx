@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import pool from "@/lib/db";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export default async function WargaLayout({
     children,
@@ -32,7 +33,7 @@ export default async function WargaLayout({
 
     return (
         <div className="flex flex-col min-h-screen bg-gray-50 pb-16">
-            {/* Header */}
+            <ServiceWorkerRegister />
             <header className="bg-white shadow-sm p-3 sticky top-0 z-10 flex items-center justify-center space-x-3">
                 {settings.logo && (
                     <img src={settings.logo} alt="Logo" className="w-8 h-8 rounded-full object-cover" />

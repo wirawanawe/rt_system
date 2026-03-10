@@ -104,7 +104,7 @@ export default function AdminLayout({
                             RT
                         </div>
                     )}
-                    <span className="font-bold text-xl text-gray-800 truncate">{settings.nama_rt || "RT System"}</span>
+                    <span className="font-bold text-xl text-gray-800 truncate">{settings.app_title || "RT System"}</span>
                     <button
                         className="ml-auto lg:hidden"
                         onClick={() => setSidebarOpen(false)}

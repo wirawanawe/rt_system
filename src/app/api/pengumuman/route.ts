@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import pool from "@/lib/db";
+import { RowDataPacket } from "mysql2";
+import { requireAdmin, jsonResponse, errorResponse, checkRateLimit } from "@/lib/api-helpers";
+import cache, { CACHE_TTL } from "@/lib/cache";
+import { validateFileOrError, ALLOWED_DOC_TYPES } from "@/lib/file-validator";
 import { writeFile } from "fs/promises";
 import path from "path";
 
@@ -11,23 +13,30 @@ export async function GET(req: Request) {
         const id = searchParams.get("id");
 
         if (id) {
-            const [rows]: any = await db.query("SELECT * FROM pengumuman WHERE id = ?", [id]);
-            if (rows.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
-            return NextResponse.json(rows[0]);
+            const [rows]: any = await pool.query("SELECT * FROM pengumuman WHERE id = ?", [id]);
+            if (rows.length === 0) return errorResponse("Not found", 404);
+            return jsonResponse(rows[0]);
         }
 
-        const [rows] = await db.query("SELECT * FROM pengumuman ORDER BY tanggal_dibuat DESC");
-        return NextResponse.json(rows);
+        const data = await cache.getOrSet('pengumuman:list', CACHE_TTL.PENGUMUMAN, async () => {
+            const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM pengumuman ORDER BY tanggal_dibuat DESC");
+            return rows;
+        });
+
+        return jsonResponse(data, { maxAge: 60 });
     } catch (error) {
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
+        console.error(error);
+        return errorResponse();
     }
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "pengurus") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Rate limit: upload operations
+    const rateLimitError = checkRateLimit(req, 'UPLOAD');
+    if (rateLimitError) return rateLimitError;
+
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     try {
         const formData = await req.formData();
@@ -35,44 +44,54 @@ export async function POST(req: Request) {
         const isi = formData.get("isi") as string;
         const file = formData.get("lampiran") as File | null;
 
+        // Validate uploaded file (allow documents: images + PDF)
+        if (file && file.size > 0) {
+            const fileError = validateFileOrError(file, { allowedTypes: ALLOWED_DOC_TYPES });
+            if (fileError) return fileError;
+        }
+
         let lampiranPath = null;
 
-        if (file) {
+        if (file && file.size > 0) {
             const buffer = Buffer.from(await file.arrayBuffer());
             const filename = Date.now() + "_" + file.name.replaceAll(" ", "_");
             const uploadDir = path.join(process.cwd(), "public/uploads/pengumuman");
-
             await writeFile(path.join(uploadDir, filename), buffer);
             lampiranPath = `/uploads/pengumuman/${filename}`;
         }
 
-        const [result]: any = await db.query(
+        const [result]: any = await pool.query(
             "INSERT INTO pengumuman (judul, isi, lampiran) VALUES (?, ?, ?)",
             [judul, isi, lampiranPath]
         );
 
-        return NextResponse.json({ message: "Created", id: result.insertId });
+        cache.invalidate('pengumuman');
+
+        return jsonResponse({ message: "Created", id: result.insertId }, { status: 201 });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
+        return errorResponse();
     }
 }
 
 export async function DELETE(req: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "pengurus") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const rateLimitError = checkRateLimit(req, 'WRITE');
+    if (rateLimitError) return rateLimitError;
+
+    const { error } = await requireAdmin();
+    if (error) return error;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+    if (!id) return errorResponse("ID required", 400);
 
     try {
-        await db.query("DELETE FROM pengumuman WHERE id = ?", [id]);
-        return NextResponse.json({ message: "Deleted" });
+        await pool.query("DELETE FROM pengumuman WHERE id = ?", [id]);
+        cache.invalidate('pengumuman');
+        return jsonResponse({ message: "Deleted" });
     } catch (error) {
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
+        console.error(error);
+        return errorResponse();
     }
 }
