@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS aduan (
     warga_id INT NOT NULL,
     judul VARCHAR(255) NOT NULL,
     isi TEXT NOT NULL,
+    lampiran VARCHAR(255) NULL,
     status ENUM('pending', 'proses', 'selesai') DEFAULT 'pending',
     balasan TEXT NULL,
     tanggal_dibuat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

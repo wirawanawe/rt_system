@@ -136,6 +136,7 @@ export default function AdminAduanPage() {
                             <TableHead>Warga</TableHead>
                             <TableHead>Judul Aduan</TableHead>
                             <TableHead>Isi</TableHead>
+                            <TableHead>Lampiran</TableHead>
                             <TableHead>Tanggal</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Aksi</TableHead>
@@ -144,14 +145,14 @@ export default function AdminAduanPage() {
                     <TableBody>
                         {loading && (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-10 text-gray-400">
+                                <TableCell colSpan={7} className="text-center py-10 text-gray-400">
                                     Memuat data...
                                 </TableCell>
                             </TableRow>
                         )}
                         {!loading && list.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-10">
+                                <TableCell colSpan={7} className="text-center py-10">
                                     <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                                     <p className="text-gray-400">Belum ada aduan masuk</p>
                                 </TableCell>
@@ -175,6 +176,15 @@ export default function AdminAduanPage() {
                                                 <MessageSquare className="w-3 h-3 text-blue-400" />
                                                 <p className="text-xs text-blue-500 truncate">{item.balasan}</p>
                                             </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {item.lampiran ? (
+                                            <a href={item.lampiran} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                                                Lihat File
+                                            </a>
+                                        ) : (
+                                            <span className="text-gray-400 text-sm">-</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="text-sm text-gray-500 whitespace-nowrap">
@@ -220,6 +230,15 @@ export default function AdminAduanPage() {
                                 <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Dari {selected.nama}</p>
                                 <p className="font-semibold text-gray-800">{selected.judul}</p>
                                 <p className="text-sm text-gray-600">{selected.isi}</p>
+                                {selected.lampiran && (
+                                    <div className="mt-2">
+                                        <img
+                                            src={selected.lampiran}
+                                            alt="Lampiran aduan"
+                                            className="w-full max-h-48 object-cover rounded-md border"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">

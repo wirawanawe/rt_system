@@ -8,11 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, MessageSquare, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, MessageSquare, Clock, CheckCircle2, Loader2, Camera } from "lucide-react";
 
 export default function AduanPage() {
     const { toast } = useToast();
-    const [formData, setFormData] = useState({ judul: "", isi: "" });
+    const [formData, setFormData] = useState({ judul: "", isi: "", lampiran: null as File | null });
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -34,15 +34,22 @@ export default function AduanPage() {
     const handleSubmit = async () => {
         if (!formData.judul.trim() || !formData.isi.trim()) return;
         setLoading(true);
+
+        const data = new FormData();
+        data.append("judul", formData.judul);
+        data.append("isi", formData.isi);
+        if (formData.lampiran) {
+            data.append("lampiran", formData.lampiran);
+        }
+
         try {
             const res = await fetch("/api/aduan", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
+                body: data,
             });
             if (res.ok) {
                 toast({ title: "Berhasil", description: "Aduan berhasil dikirim ke pengurus" });
-                setFormData({ judul: "", isi: "" });
+                setFormData({ judul: "", isi: "", lampiran: null });
                 fetchHistory();
             } else {
                 const err = await res.json();
@@ -105,6 +112,36 @@ export default function AduanPage() {
                             onChange={(e) => setFormData({ ...formData, isi: e.target.value })}
                         />
                     </div>
+                    <div>
+                        <Label className="text-sm font-medium">Foto Bukti (Opsional)</Label>
+                        <div className="mt-1 flex items-center gap-3">
+                            <label className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 bg-gray-50 text-gray-500 hover:bg-gray-100 cursor-pointer transition-colors shadow-sm shrink-0">
+                                <Camera className="w-5 h-5" />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            setFormData({ ...formData, lampiran: e.target.files[0] });
+                                        }
+                                    }}
+                                />
+                            </label>
+                            <div className="flex-1 text-sm text-gray-500 truncate">
+                                {formData.lampiran ? formData.lampiran.name : "Ambil atau pilih foto..."}
+                            </div>
+                            {formData.lampiran && (
+                                <button
+                                    onClick={() => setFormData({ ...formData, lampiran: null })}
+                                    className="text-red-500 hover:text-red-700 text-xs shrink-0"
+                                >
+                                    Hapus
+                                </button>
+                            )}
+                        </div>
+                    </div>
                     <Button
                         className="w-full bg-blue-600 hover:bg-blue-700"
                         onClick={handleSubmit}
@@ -140,7 +177,16 @@ export default function AduanPage() {
                                         </span>
                                     </div>
                                     <p className="text-sm text-gray-600 leading-relaxed">{item.isi}</p>
-                                    <p className="text-xs text-gray-400">
+                                    {item.lampiran && (
+                                        <div className="mt-2">
+                                            <img
+                                                src={item.lampiran}
+                                                alt="Lampiran aduan"
+                                                className="w-full max-h-48 object-cover rounded-md border"
+                                            />
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-2">
                                         {new Date(item.tanggal_dibuat).toLocaleDateString("id-ID", {
                                             day: "numeric", month: "long", year: "numeric"
                                         })}
