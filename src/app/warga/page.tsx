@@ -38,7 +38,7 @@ export default function WargaHome() {
     return (
         <div className="space-y-4">
             <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg mb-6">
-                <h2 className="text-lg font-bold">Selamat Datang PETIR!</h2>
+                <h2 className="text-lg font-bold">Selamat Datang Warga Tirta Kencana!</h2>
                 <p className="text-sm opacity-90">Simak informasi terbaru seputar lingkungan RT kita.</p>
             </div>
 
