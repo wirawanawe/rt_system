@@ -57,7 +57,7 @@ export async function POST(req: Request) {
             if (fileError) return fileError;
 
             const buffer = Buffer.from(await file.arrayBuffer());
-            const filename = `aduan-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
+            const filename = `aduan-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
             const uploadDir = path.join(process.cwd(), "public", "uploads", "aduan");
             
             // Create directory if it doesn't exist - though usually we assume it does, but wait, if it doesn't exist it might crash.

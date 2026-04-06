@@ -148,7 +148,7 @@ export async function POST(req: Request) {
         let buktiBayarPath = null;
         if (file && file.size > 0) {
             const buffer = Buffer.from(await file.arrayBuffer());
-            const filename = `iuran-${Date.now()}-${file.name.replace(/\s/g, '_')}`;
+            const filename = `iuran-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
             const uploadDir = path.join(process.cwd(), "public", "uploads", "iuran");
             await writeFile(path.join(uploadDir, filename), buffer);
             buktiBayarPath = `/uploads/iuran/${filename}`;

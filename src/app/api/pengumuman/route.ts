@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
         if (file && file.size > 0) {
             const buffer = Buffer.from(await file.arrayBuffer());
-            const filename = Date.now() + "_" + file.name.replaceAll(" ", "_");
+            const filename = Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
             const uploadDir = path.join(process.cwd(), "public/uploads/pengumuman");
             await writeFile(path.join(uploadDir, filename), buffer);
             lampiranPath = `/uploads/pengumuman/${filename}`;
