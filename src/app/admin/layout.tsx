@@ -14,7 +14,8 @@ import {
     LogOut,
     Menu,
     X,
-    AlertTriangle
+    AlertTriangle,
+    User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -169,6 +170,10 @@ export default function AdminLayout({
                                 {stats.pending_aduan}
                             </span>
                         )}
+                    </Link>
+                    <Link href="/admin/profil" className={`flex items-center space-x-3 p-3 rounded-lg transition hover:bg-blue-50 hover:text-blue-600 ${isActive('/admin/profil')}`}>
+                        <User className="w-5 h-5" />
+                        <span>Profil</span>
                     </Link>
                     <Link href="/admin/pengaturan" className={`flex items-center space-x-3 p-3 rounded-lg transition hover:bg-blue-50 hover:text-blue-600 ${isActive('/admin/pengaturan')}`}>
                         <Settings className="w-5 h-5" />

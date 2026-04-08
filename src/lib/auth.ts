@@ -10,7 +10,8 @@ export const authOptions: NextAuthOptions = {
             name: "Credentials",
             credentials: {
                 nik: { label: "NIK", type: "text" },
-                password: { label: "Password", type: "password" }
+                password: { label: "Password", type: "password" },
+                loginAs: { label: "Role", type: "text" }
             },
             async authorize(credentials) {
                 if (!credentials?.nik || !credentials?.password) {
@@ -34,11 +35,19 @@ export const authOptions: NextAuthOptions = {
                     throw new Error("Invalid password");
                 }
 
+                if (credentials?.loginAs === "pengurus" && user.role !== "pengurus") {
+                    throw new Error("Akses ditolak: Anda bukan pengurus");
+                }
+
+                const effectiveRole = (user.role === "pengurus" && credentials?.loginAs === "warga") 
+                    ? "warga" 
+                    : user.role;
+
                 return {
                     id: user.id.toString(),
                     name: user.nama,
-                    email: user.nik, // Using NIK as email identifier for simplicity in default session
-                    role: user.role,
+                    email: user.nik,
+                    role: effectiveRole,
                 };
             }
         })

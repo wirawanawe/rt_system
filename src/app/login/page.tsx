@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function LoginPage() {
     const [nik, setNik] = useState("");
     const [password, setPassword] = useState("");
+    const [loginAs, setLoginAs] = useState("warga");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
     const { toast } = useToast();
@@ -25,10 +26,11 @@ export default function LoginPage() {
                 redirect: false,
                 nik,
                 password,
+                loginAs,
             });
 
             if (res?.error) {
-                toast({ title: "Login Gagal", description: "NIK atau Password salah", variant: "destructive" });
+                toast({ title: "Login Gagal", description: res.error || "NIK atau Password salah", variant: "destructive" });
             } else {
                 toast({ title: "Login Berhasil", description: "Mengalihkan..." });
 
@@ -80,6 +82,18 @@ export default function LoginPage() {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="loginAs">Login Sebagai</Label>
+                            <select
+                                id="loginAs"
+                                value={loginAs}
+                                onChange={(e) => setLoginAs(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="warga">Warga</option>
+                                <option value="pengurus">Pengurus RT</option>
+                            </select>
                         </div>
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading ? "Memproses..." : "Masuk"}
